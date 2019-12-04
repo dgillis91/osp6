@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <signal.h>
 #include <fcntl.h>
+#include <sys/msg.h>
 
 #include "../include/util.h"
 #include "../include/pclock.h"
@@ -18,6 +19,11 @@
 #define MAX_RUN_TIME_NANO MAX_RUN_TIME_SECONDS * NANO_SEC_IN_SEC
 #define CONSOLE_OUT 1
 
+typedef struct message_buffer {
+    long mtype;
+    pid_t child_pid;
+    int amount;
+} message_buffer_t;
 
 void terminate_program();
 unsigned long compute_random_next_init_time(unsigned long current_time_nano);
@@ -26,6 +32,7 @@ void sig_handler(int signum);
 
 static int proc_shid;
 static int out_fd;
+//static int msgqid;
 
 int main(int argc, char* argv[]) {
     init_prog_opts(OPT_KEY);
@@ -50,6 +57,14 @@ int main(int argc, char* argv[]) {
         perror("OSS: Fail to set SIGALRM");
     }
     alarm(get_allowable_run_time());
+
+    // Initialize the message queue
+    //msgqid = msgget(MESSAGE_QUEUE_KEY, IPC_CREAT | MSG_QUEUE_PERMS);
+    //if (msgqid == -1) {
+    //    perror("Failed to initialize parent message queue");
+    //    terminate_program();
+    //}
+    //message_buffer_t msg;
 
     unsigned long current_time_nano;
     unsigned long next_process_init_time = MAX_TIME_BETWEEN_PROCS_NANO;
@@ -76,6 +91,7 @@ int main(int argc, char* argv[]) {
             }
             next_process_init_time = compute_random_next_init_time(current_time_nano);
         }
+        // Handle process termination
         if (get_count_procs_ready_terminate() > 0) {
             int stat;
             mark_terminate();
@@ -87,6 +103,10 @@ int main(int argc, char* argv[]) {
             --current_process_count;
             print_proc_handle(out_fd);
         }
+        // Wait for request from user process
+        //if (msgrcv(msgqid, &msg, sizeof(msg), (long) getpid(), 0) == -1) {
+        //    perror("Fail to get message from child");
+        //}
 
         //fprintf(stderr, "OSS: Time [%u:%uT%lu]\n",
         //        get_seconds(), get_nano(), current_time_nano);
@@ -98,6 +118,7 @@ int main(int argc, char* argv[]) {
     destruct_clock();
     destruct_proc_handle(proc_shid);
     destruct_prog_opts();
+    //msgctl(msgqid, IPC_RMID, NULL);
     close(out_fd);
     return 0;
 }
@@ -119,6 +140,7 @@ void terminate_program() {
     destruct_proc_handle(proc_shid);
     destruct_clock();
     destruct_prog_opts();
+    //msgctl(msgqid, IPC_RMID, NULL);
     close(out_fd);
     kill(0, SIGKILL);
     exit(1);

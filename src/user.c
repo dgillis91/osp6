@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
+#include <sys/msg.h>
 
 #include "../include/pclock.h"
 #include "../include/sharedvals.h"
@@ -12,6 +13,12 @@
 #define PROBABILITY_TERMINATE 20
 #define PROBABILITY_REQUEST 60
 
+
+typedef struct message_buffer {
+    long mtype;
+    pid_t child_pid;
+    int amount;
+} message_buffer_t;
 
 /* Return true if the process should terminate.
  * Non-deterministic. We expect this to return
@@ -54,6 +61,11 @@ int main(int argc, char* argv[]) {
     init_clock(CLOCK_KEY);
     int proc_shid = init_proc_handle(PROC_KEY);
     init_prog_opts(OPT_KEY);
+    //int msgqid = msgget(MESSAGE_QUEUE_KEY, MSG_QUEUE_PERMS);
+    //if (msgqid == -1) {
+    //    perror("Failed to init q in child");
+    //    return 1;
+    //}
 
     srand(time(NULL) ^ (getpid() << 16));
 
@@ -89,11 +101,38 @@ int main(int argc, char* argv[]) {
             if (is_should_request()) {
                 fprintf(stderr, "[+] USER: Requesting resources in PID %ld at %lld\n",
                         (long) getpid(), current_tick);
+                
                 // Make request
+                message_buffer_t msg;
+                msg.mtype = (long) getppid();
+                msg.amount = 42;
+                //fprintf(stderr, "USER: Sending message to parent %ld\n", (long) getppid());
+                //int msg_stat = msgsnd(msgqid, &msg, sizeof(msg), 0);
+                //if (msg_stat == -1) {
+                //    perror("Fail to make request child");
+                //}
+
+                // Wait for the response
+                //if (msgrcv(msgqid, &msg, sizeof(msg), (long) getpid(), 0) == -1) {
+                //    perror("Fail to get message from parent: make request");
+                //}
+                //fprintf(stderr, "USER: got response %d from parent\n", msg.amount);
             } else {
                 fprintf(stderr, "[+] USER: Releasing resources in PID %ld at %lld\n",
                         (long) getpid(), current_tick);
                 // Make release
+                //message_buffer_t msg;
+                //msg.mtype = (long) getppid();
+                //msg.amount = -42;
+                //fprintf(stderr, "USER: Sending message to parent %ld\n", (long) getppid());
+                //int msg_stat = msgsnd(msgqid, &msg, sizeof(msg), 0);
+                //if (msg_stat == -1) {
+                //    perror("Fail to make release");
+                //}
+                //if (msgrcv(msgqid, &msg, sizeof(msg), (long) getpid(), 0) == -1) {
+                //    perror("Fail to get message from parent");
+                //}
+                //fprintf(stderr, "USER: Got response %d from parent\n", msg.amount);
             }
         }
     }
